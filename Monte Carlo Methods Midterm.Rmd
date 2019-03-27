@@ -1,0 +1,558 @@
+---
+title: "Monte Carlo Methods Midterm"
+author: "Kylie Taylor"
+date: "3/28/2019"
+output: pdf_document
+---
+
+Suppose observations $y_{ij}$ for i =1,...,n and for j = 1,...,m arise given ($v_i$) accroding to 
+
+$log(y_{ij}) = \mu + log(\frac{v_i}{v_i + x_{ij}}) + \sigma \epsilon{ij}$
+
+where ($\epsilon{ij}$) are iid standard normal 
+
+$\epsilon{ij} \sim iid N(0,1) \propto e^{-\frac{1}{2}x^2}$
+
+The $log(v_i)$ are random parameters and i.i.d. from a normal distribution with mean $\nu$ and variance $\phi^2$
+
+$f(log(v_i)) \sim iid N(\nu, \phi^2) \propto \frac{1}{\sqrt{2\pi\phi^2}} e^{-\frac{(logv_i-\nu)^2}{2\phi^2}}$
+
+The parameters of the model are $\theta = (\mu, \sigma, \nu, \phi)$.
+
+
+The prior for $\mu$ is normal with mean 0 and variance $\xi^2$.
+
+$f(\mu) \sim N(0, \xi^2) =  \frac{1}{\sqrt{2\pi\xi^2}} e^{-\frac{\mu^2}{2\xi^2}}$
+
+
+The prior to $\nu$ is normal with mean 0 and variance $\psi^2$.
+
+$f(\nu) \sim N(0, \psi^2) =  \frac{1}{\sqrt{2\pi\psi^2}} e^{-\frac{\nu^2}{2\psi^2}}$
+
+
+The prior for $\eta=\frac{1}{\phi^2}$ is Gamma with parameters (c,d).
+
+$f(\eta)=\frac{1}{\phi^2} \sim Ga(c, d) \propto \eta^{c-1} e^{-d\eta}$
+
+The prior for $\lambda = \frac{1}{\sigma^2}$ is Gamma with parameters (a,b).
+
+$f(\lambda) = \frac{1}{\sigma^2} \sim Ga(a, b) \propto \lambda^{a-1} e^{-b\lambda}$
+
+
+The data are for n = 86 and m = 7 for each $i$, it is that $x_{ij} = j$.
+
+The prior settings, i.e. (a, b, $\psi$, $\xi$, c, d)
+
+
+```{r, include=FALSE}
+Data <- read.table("~/Downloads/mid.dat.txt", quote="\"")
+```
+
+
+For this midterm, I will do the following steps:
+
+1) Download and use the data, where I am given $x_{ij}$, i = 1,...,86 and j = 1,...,7
+
+2) Pick a fixed $(\mu, \sigma, \nu, \phi)$ and generate $v_i = (v_1), ...,(v_{86})$ from $logN(\nu, \phi^2)$
+
+3) Generate $log(y_{ij})$ from $N(\mu + log(\frac{v_i}{v_i + x_{ij}}), \sigma^2)$
+
+4) Code the Markov Chain of the conditional densities $f(\mu|...) $, $f(\nu|...)$, $f(\eta|...)$, $f(\lambda|...)$ and $f(v_i|...)$
+
+5) Report the output of the chain.
+
+6) Find an estimate for $v_{87}$
+
+
+#1) Data
+
+
+The first step is to make sure the data is downloaded correctly. Since I do not know any information about the seven variables in this dataset, I cannot say that the summary statistics reveal anything alarming. 
+
+
+```{r, echo=FALSE}
+pander::pander(summary(Data))
+```
+
+
+The summary statistics of the 7 variables, V2-V8 (V1 is a count), reveal that every observation is bounded between 0 and 1.
+
+
+
+
+#2) Generating $v_i$ from fixed $(\mu, \sigma, \nu, \phi)$
+
+
+In order to generate samples $(v_1), ...,(v_{86})$ from $v_i \sim logN(\nu, \phi^2)$ I need to specify my parameters $(\mu, \sigma, \nu, \phi)$. I will specifiy these parameters by sampling from their joint densities, which are written above.
+
+I will generate an estimate for $\mu$ by randomly generating 1,000,000 observations from $f(\mu) \sim N(0, \xi^2)$, then taking the average of all those samples. In order to do this, I must pick a $\xi^2$ value that I deem appropriate, which I chose to be 0.1. This makes the estimate for $\mu$ = 0.00014.
+
+
+I will generate an estimate for $\nu$ using the same process as I did for $\mu$. I will generate 1,000,000 random samples from $f(\nu) \sim N(0, \psi^2)$, then take the average of all samples and use that as my fixed $\nu$. Since $\psi^2$ is not already specified, I will chose $\psi^2$ = 0.05. This makes the estimate of $\nu$=0.000024.
+
+
+Following the same steps, I will generate an estimate for $\sigma^2$. Recall, $f(\lambda) = \frac{1}{\sigma^2} \sim Ga(a, b)$. This means I will be randomly sampling $f(\lambda)$, then solving for $\sigma^2$. In order to do this, I must chose an $(a,b)$ so I can generate 1,000,000 samples from $f(\lambda)$. I pick $a$ = 2 and $b$ = 1. This gave me an average estimate of $\lambda$ = 2.0. This makes $\sigma = \sqrt{\frac{1}{\lambda^2}{} = \sqrt{0.25}$, or $\sigma^2$ = 0.25.
+
+
+Lastly, I will pick a $\phi^2$ by randomly sampling from $f(\eta) = \frac{1}{\phi^2} \sim Ga(c, d)$. The $(c,d)$ that I chose are $c$ = 3, and $d$ = 2. This gives me an estimate for $\eta$ = 6.0 averaged over 1,000,000 samples. This means that $\phi = \sqrt{\frac{1}{\eta^2}} = \sqrt{0.02778}$, or that $\phi^2 = 0.02778$
+
+```{r, include=FALSE}
+set.seed(10000)
+MU <- rnorm(1000000, 0, 0.1)
+mean(MU)
+
+NU <- rnorm(1000000, 0, 0.05)
+mean(NU)
+
+LAMBDA <- rgamma(1000000, shape = 2 , scale = 1)
+mean(LAMBDA)
+
+ETA <- rgamma(1000000, shape =3 , scale = 2)
+mean(ETA)
+```
+
+
+Stated above, $log(v_i) \sim N(\nu, \phi^2)$ was given, this means that the distribution of $v_i$ is a log-normal, since it is simply $e^{log(v_i)}$. This is why I will now generate estimates for $v_i = (v_1), ...,(v_{86})$ from $logN(\nu, \phi^2)$ using the fixed parameters that I generated above. 
+I will sample from $logN(\nu, \phi^2)$ 10,000 times, then take the average $v_i$ across all the generated samples and use that to continue my analysis. This leaves me with a 86 x 1 matrix with each entry as the bootstrapped sample for $v_i$ for every $i=1,..,86$.
+
+
+```{r, include=FALSE}
+set.seed(88888)
+library(mosaic)
+V.est = do(10000)*{
+  V <- matrix(rlnorm(86, 0.000024, 0.02778), nrow = 86, ncol = 1)
+}
+```
+
+```{r, include=FALSE}
+v <- as.matrix(colMeans(V.est))
+```
+
+
+
+
+#3) Generating $log(y_{ij})$
+
+I will now generate $log(y_{ij})$ from $N(\mu + log(\frac{v_i}{v_i + x_{ij}}), \sigma^2)$. I will be using the fixed parameters I determined earlier, the estimates for $v_i$, an 86x1 matrix, and the data, $x_{ij}$, and 86x7 matrix. I will sample  $N(\mu + log(\frac{v_i}{v_i + x_{ij}}), \sigma^2)$ 100,000 times, then take the average of all entries to have the final 86x7 matrix of $log(y_{ij})$ that I will use for implementing the Markov Chain and further analysis.
+
+```{r, include=FALSE}
+set.seed(888)
+Data.matrix <- as.matrix(Data)
+
+logY1.est = do(100000)*{
+  logY1 <- matrix(rnorm(86, (0.00014 + log(v)/log(v+Data.matrix[,2])), 0.25) , nrow = 86, ncol = 1)
+}
+logY1.avg <- as.matrix(colMeans(logY1.est))
+
+logY2.est = do(100000)*{
+  logY2 <- matrix(rnorm(86, (0.00014 + log(v)/log(v+Data.matrix[,3])), 0.25) , nrow = 86, ncol = 1)
+}
+logY2.avg <- as.matrix(colMeans(logY2.est))
+
+logY3.est = do(100000)*{
+  logY3 <- matrix(rnorm(86, (0.00014 + log(v)/log(v+Data.matrix[,4])), 0.25) , nrow = 86, ncol = 1)
+}  
+logY3.avg <- as.matrix(colMeans(logY3.est))
+ 
+logY4.est = do(100000)*{
+  logY4 <- matrix(rnorm(86, (0.00014 + log(v)/log(v+Data.matrix[,5])), 0.25) , nrow = 86, ncol = 1)
+}
+logY4.avg <- as.matrix(colMeans(logY4.est))
+
+logY5.est = do(100000)*{
+  logY5 <- matrix(rnorm(86, (0.00014 + log(v)/log(v+Data.matrix[,6])), 0.25) , nrow = 86, ncol = 1)
+}
+logY5.avg <- as.matrix(colMeans(logY5.est))
+
+logY6.est = do(100000)*{
+  logY6 <- matrix(rnorm(86, (0.00014 + log(v)/log(v+Data.matrix[,7])), 0.25) , nrow = 86, ncol = 1)
+}
+logY6.avg <- as.matrix(colMeans(logY6.est))
+
+logY7.est = do(100000)*{
+  logY7 <- matrix(rnorm(86, (0.00014 + log(v)/log(v+Data.matrix[,8])), 0.25) , nrow = 86, ncol = 1)
+}
+logY7.avg <- as.matrix(colMeans(logY7.est))
+  
+
+logY <- as.matrix(cbind(logY1.avg, logY2.avg, logY3.avg, logY4.avg, logY5.avg, logY6.avg, logY7.avg))
+logY
+```
+
+
+
+
+#4) Code Markov Chain
+
+Now that I have my generated $log(y_{ij})$'s, I now must code the Markov chain of the conditional denisties, $f(\mu|...) $, $f(\nu|...)$, $f(\eta|...)$ and $f(\lambda|...)$. My goal is to have Monte Carlo estimates for all of my parameters and for each $v_i$, that I can use to fit $log(y_{ij})$ and find a value for $v_{87}$.
+
+In order to do this, I must use target density, which is $f(\theta)$, where $\theta = (y_{ij}, v_i, \mu, \nu, \lambda, \eta)$. This means that there will be 6 conditional densities. 
+
+We were given the conditional density for $log(y_{ij})$ in the beginning, as 
+
+$f(log(y_{ij}) | v_i, \mu, \nu, \lambda, \eta ) \sim N(\mu + log(\frac{v_i}{v_i + x_{ij}}), \sigma^2)$.
+
+This will be used to solve for other conditional densities.
+
+
+
+To begin, I will define the joint density,
+
+$f(y_{ij},v_i,\mu,\nu,\lambda,\eta)=f(log(y_{ij})|v_i,\mu,\nu,\lambda,\eta)*f(v_{i}|\mu,\nu,\lambda,\eta)*f(\mu)*f(\nu)*f(\lambda)*f(\eta)$
+
+The first conditional density I will find is 
+
+$f(\lambda|y_{ij},v_i,\mu,\nu,\eta) \propto f(\lambda)\prod_{i,j}f(log(y_{ij})|v_i,\mu,\nu,\lambda,\eta)$
+
+since $\lambda = \frac{1}{\sigma^2}$, the only other density where $\lambda$ shows up is in $f(log(y_{ij})|v_i,\mu,\nu,\lambda,\eta)$.
+
+$f(\lambda|y_{ij},v_i,\mu,\nu,\eta) \propto \lambda^{a-1}e^{-b\lambda} \prod_{i,j}\frac{1}{\sqrt{2\pi\sigma^2}}e^{-\frac{(log(y_{ij})-\mu-log(\frac{v_i}{v_i+x_{ij}}))^2}{2\sigma^2}}$
+
+
+$\propto \lambda^{a-1}e^{-b\lambda} \lambda^{\frac{nm}{2}} e^{-\frac{\lambda}{2}\sum_{i,j}(log(y_{ij})-\mu-log(\frac{v_i}{v_i+x_{ij}}))^2}$
+
+
+$\propto \lambda^{a+\frac{nm}{2}-1} e^{-b\lambda-\frac{\lambda}{2}\sum_{i,j}(log(y_{ij})-\mu-log(\frac{v_i}{v_i+x_{ij}}))^2}$
+
+
+Therefore $f(\lambda|y_{ij},v_i,\mu,\nu,\eta) \sim Ga(a+\frac{nm}{2}, b+ \frac{1}{2}\sum_{i,j}(log(y_{ij})-\mu-log(\frac{v_i}{v_i+x_{ij}})))$
+
+
+
+The next conditional density I will calculate is 
+
+$f(\eta|y_{ij},log(v_i),\mu,\nu,\lambda) \propto f(\eta)\prod_{i=1}^{n}f(log(v_{i})|\mu,\nu,\lambda,\eta)$
+
+Here, $\eta = \frac{1}{\phi^2}$, which only shows up in the conditional density $f(logv_{i}|\mu,\nu,\lambda,\eta)$. I only take the product over all the individuals, i, since the seven traits, j, do not enter these densities. I will use the density given for $log(v_i) \sim N(\nu, \phi^2)$ when solving for this conditional density, since it makes calculations more simple.
+
+
+$f(\eta|log(y_{ij}),log(v_i),\mu,\nu,\lambda) \propto \eta^{c-1} e^{-d\eta} \prod_{i=1}^{n} \frac{1}{\sqrt{2\pi\phi^2}} e^{-\frac{(logv_i-\nu)^2}{2\phi^2}}$ 
+
+
+$\propto \eta^{c-1} e^{-d\eta} \prod_{i=1}^{n} \eta^{\frac{1}{2}} e^{-\frac{\eta}{2}(log(v_i)-\nu)^2}$
+
+
+$\propto \eta^{c-1} e^{-d\eta} \eta^{\frac{n}{2}} e^{-\frac{\eta}{2}\sum_{i=1}^{n}(log(v_i)-\nu)^2}$
+
+
+$\propto \eta^{c+\frac{n}{2}-1} e^{-d\eta-\frac{\eta}{2}\sum_{i=1}^{n}(log(v_i)-\nu)^2}$
+
+
+Therefore $f(\eta|y_{ij},log(v_i),\mu,\nu,\lambda) \sim Ga(c+\frac{n}{2}, d + \frac{1}{2}\sum_{i=1}^{n}(log(v_i)-\nu))$
+
+
+
+The next conditional density I will calculate is 
+
+$f(\mu|y_{ij},v_i,\nu,\lambda,\eta) \propto f(\mu) \prod_{i,j}f(log(y_{ij})|v_i,\mu,\nu,\lambda,\eta)$
+
+This is the form of the conditional density because $\mu$ only shows up in $f(\mu)$ and $f(log(y_{ij})|v_i,\mu,\nu,\lambda,\eta)$.
+
+
+$f(\mu|y_{ij},v_i,\nu,\lambda,\eta) \propto  \frac{1}{\sqrt{2\pi\xi^2}} e^{-\frac{\mu^2}{2\xi^2}} \prod_{i,j}\frac{1}{\sqrt{2\pi\sigma^2}}e^{-\frac{(log(y_{ij})-\mu-log(\frac{v_i}{v_i+x_{ij}}))^2}{2\sigma^2}}$
+
+
+$\propto e^{-\frac{\mu^2}{2\xi^2}} e^{-\frac{\lambda}{2} \sum_{i,j}(log(y_{ij})-\mu-log(\frac{v_i}{v_i+x_{ij}}))^2}$
+
+
+I will call $log(y_{ij})-log(\frac{v_i}{v_i+x_{ij}}) = K_{ij}$ and $\frac{1}{\xi^2} = \tau$ which gives 
+
+
+$\propto e^{-\frac{1}{2}(\tau \mu^2 - \lambda \sum_{i,j}(K_{ij} - \mu)^2)}$
+
+
+$\propto e^{-\frac{1}{2}(\tau \mu^2 - \lambda \sum_{i,j}(K_{ij}^2 - 2\mu K_{ij} + \mu^2))}$
+
+
+$\propto e^{-\frac{1}{2}(\tau \mu^2 - \lambda \sum_{i,j}K_{ij}^2 + 2\lambda \mu \sum_{i,j}K_{ij} - \lambda \mu^2 n m)}$
+
+
+$\propto e^{-\frac{1}{2}(\mu^2 (\tau - \lambda nm) +\mu (2\lambda \sum_{i,j}K_{ij}) - \lambda \sum_{i,j}K_{ij}^2)}$
+
+
+$\propto e^{-\frac{(\tau - \lambda nm)}{2}(\mu^2 +\mu \frac{(2\lambda \sum_{i,j}K_{ij})}{(\tau - \lambda nm)} - \frac{\lambda \sum_{i,j}K_{ij}^2}{(\tau - \lambda nm)})}$
+
+
+$\propto e^{-\frac{(\tau - \lambda nm)}{2}(\mu^2 -\mu \frac{(2\lambda \sum_{i,j}K_{ij})}{(\lambda nm- \tau)} + \frac{\lambda \sum_{i,j}K_{ij}^2}{(\lambda nm- \tau)^2})}$
+
+
+$\propto e^{-\frac{(\tau - \lambda nm)}{2}(\mu - \frac{\lambda \sum_{i,j}K_{ij}}{(\lambda nm- \tau)})^2}$
+
+
+Therefore $f(\mu|y_{ij},v_i,\nu,\lambda,\eta) \sim N(\frac{\lambda \sum_{i,j}K_{ij}}{(\lambda nm- \tau)}, \frac{1}{(\tau - \lambda nm)})$
+
+substituting back in $log(y_{ij})-log(\frac{v_i}{v_i+x_{ij}}) = K_{ij}$ and $\frac{1}{\xi^2} = \tau$,
+
+$f(\mu|y_{ij},v_i,\nu,\lambda,\eta) \sim N(\frac{\lambda \sum_{i,j}(log(y_{ij})-log(\frac{v_i}{v_i+x_{ij}}))}{(\lambda nm- \frac{1}{\xi^2})}, \frac{1}{(\frac{1}{\xi^2} - \lambda nm)})$
+
+
+
+The next conditional I will calculate id
+
+$f(\nu|y_{ij},v_i,\mu,\lambda,\eta) \propto f(\nu) \prod_{i=1}^{n}f(log(v_{i})|\mu,\nu,\lambda,\eta)$
+
+I will again use $log(v_i) \sim N(\nu, \phi^2)$ for simplicity of the calculation, keeping in mind $\nu$ is the parameter I'm interested in.
+
+
+$f(\nu|y_{ij},v_i,\mu,\lambda,\eta) \propto \frac{1}{\sqrt{2\pi\psi^2}} e^{-\frac{\nu^2}{2\psi^2}} \prod_{i=1}^{n}\frac{1}{\sqrt{2\pi\phi^2}} e^{-\frac{(logv_i-\nu)^2}{2\phi^2}}$
+
+
+$\propto e^{-\frac{\nu^2}{2\psi^2}} \prod_{i=1}^{n} e^{-\frac{\eta}{2}(log(v_i)-\nu)^2}$
+
+
+$\propto e^{\frac{1}{2}(\frac{1}{\psi^2}\nu^2 - \eta \sum_i(log(v_i)-\nu)^2)}$
+
+I will set $\frac{1}{\psi^2} = A$, and expand the square
+
+
+$\propto e^{-\frac{1}{2}(A\nu^2 - \eta \sum_i(log(v_i)^2 - 2log(v_i)\nu + \nu^2))}$
+
+
+$\propto e^{-\frac{1}{2}(A\nu^2 - \eta \sum_i(log(v_i)^2) + 2\eta\nu \sum_ilog(v_i) - \eta n \nu^2))}$
+
+
+$\propto e^{-\frac{1}{2}(\nu^2(A-\eta n) - \nu(2\eta \sum_ilog(v_i)) - \eta\sum_i(log(v_i)^2)))}$
+
+
+$\propto e^{-\frac{(A-\eta n)}{2} (\nu^2 - \nu(\frac{2\eta \sum_ilog(v_i)}{\eta n-A}) + \frac{\eta \sum_ilog(v_i)^2}{(\eta n-A)^2})}$
+
+
+$\propto e^{-\frac{(A-\eta n)}{2}(\nu^2 - \frac{\eta \sum_ilog(v_i)}{(\eta n-A)})^2}$
+
+
+Therefore, $f(\nu|y_{ij},v_i,\mu,\lambda,\eta) \sim N(\frac{\eta \sum_ilog(v_i)}{\eta n-A}, \frac{1}{A-\eta n})$
+
+
+
+The last conditional density I will calculate is for
+
+$f(v_{i}|log(y_{ij}, \mu,\nu,\lambda,\eta) \propto f(v_{i}|\mu,\nu,\lambda,\eta) \prod_{i,j}f(log(y_{ij})|v_i,\mu,\nu,\lambda,\eta)$
+
+
+I will be using the distribution for $v_i$, not for $log(v_i)$, because contained within $log(y_{ij})$ is both $log(v_i)$ and $log(v_i + x_{ij})$, which would casue some issues if I only find the conditional on $log(vi)$. Recall that $v_i \sim logN(\nu, \phi^2)$. I only take the product across j = 1,...,m of $log(y_{ij})$ since $v_i$ is only indexed across i = 1,...,n, where m=7 and n=86. 
+
+This renders a conditional density of 
+
+$f(v_{i}|log(y_{ij}, \mu,\nu,\lambda,\eta) \propto  \frac{1}{v_i \sqrt{2\pi \phi^2}} e^{-\frac{(logv_i -\nu)^2}{2\phi^2}} \prod_{j}\frac{1}{\sqrt{2\pi\sigma^2}}e^{-\frac{(log(y_{ij})-\mu-log(\frac{v_i}{v_i+x_{ij}}))^2}{2\sigma^2}}$
+
+
+$\propto \frac{1}{v_i} e^{-\frac{\eta}{2} (logv_i - \nu)^2} e^{-\frac{\lambda}{2} \sum_j (y_{ij}-\mu -log(v_i)+log(v_i+x_{ij})^2}$
+
+$\propto \frac{1}{v_i} e^{-\frac{1}{2}(\eta (logv_i - \nu)^2 - \lambda \sum_j (y_{ij}-\mu -log(v_i)+log(v_i+x_{ij})^2)}$
+
+
+The form of this conditional density makes me believe that is should follow some log Normal distribution, but I am unable to find the exact parameters of the distribution since I am unable to isolate $v_i$ in the above equation.
+This means that I will have to implement a Metropolis step in order to sample from this density, since I cannot sample directly from the density above. I will need to implement the Metropolis Hastings algorithm for the 86 $v_i$ estimates.
+
+
+
+Now that I have found the conditional densities, I must take samples from them, so I can estimate $f(log(y_{ij}))$. I will implement a Gibbs Sampler to estimate the conditional densities. The Gibbs Sampler can be implemented since there are more than 2 parameters in this model.
+
+In a Gibbs framework the we define the transition density $(\lambda, \eta, \nu, \mu, v_1,...,v_{86}) \rightarrow (\lambda', \eta', \nu', \mu', v_1',...,v_{86}')$ by $P(\lambda', \eta', \nu', \mu', v_1',...,v_{86}' | \lambda, \eta, \nu, \mu, v_1,...,v_{86})$
+
+
+$P(\lambda', \eta', \nu', \mu', v_1',...,v_{86}' | \lambda, \eta, \nu, \mu, v_1,...,v_{86}) =$
+    $f(\lambda' | \eta, \nu, \mu, v_1,...,v_{86})$ *
+    $f(\eta' | \lambda', \nu, \mu, v_1,...,v_{86})$ *
+    $f(\nu' | \lambda', \eta', \mu, v_1,...,v_{86})$ *
+    $f(\mu' | \lambda', \eta', \nu',v_1,...,v_{86})$ *
+    $f(v_1' | \lambda', \eta', \nu', \mu', v_2,...,v_{86})$ *
+    ...
+    $f(v_{86}' | \lambda', \eta', \nu', \mu', v_1',...,v_{85}')$
+    
+
+I will then take N many iterations of the transition densities. We want a transition density that will give us a stationary density 
+$f(\lambda', \eta', \nu', \mu', v_1',...,v_{86}') = \int P(\lambda', \eta', \nu', \mu', v_1',...,v_{86}' | \lambda, \eta, \nu, \mu, v_1,...,v_{86}) f(\lambda, \eta, \nu, \mu, v_1,...,v_{86})$. 
+I will simplify this to 
+$f(\theta', v_i') = \int \int P(\theta', v_i'| \theta, v_i)f(\theta,v_i) = \int \int f(v_i'|\theta', v_i)f(\theta'|\theta, v_i)f(\theta,v_i)d\theta dv_i$
+
+Using $f(\theta' |\theta, v_i) = \frac{f(\theta',\theta,v_i)}{f(\theta,v_i)}$, I can now simplify to 
+
+$f(\theta', v_i') = \int \int f(v_i'|\theta', v_i)f(\theta',\theta,v_i)d\theta dv_i$
+
+$f(\theta', v_i') = \int f(v_i'|\theta', v_i)f(\theta',v_i)dv_i = \int \frac{f(v_i',\theta', v_i)}{f(\theta',v_i)}f(\theta',v_i)dv_i$
+
+$\int f(v_i',\theta', v_i) dv_i = f(\theta', v_i')$
+
+Which confirms that the transition density does render a stationary density, $f(\theta', v_i')$. 
+
+We may get stuck when trying to do these calculations in the Gibbs framework since $v_i$ cannot be sampled in that framework. This means to sample from $f(v_i|log(y_{ij}, \mu,\nu,\lambda,\eta)$, we will need a transition density that satisfies $f(x)q(y|x) = f(y)q(x|y)$. This means $p(y|x)$ shows up in the form $p(y|x) = \alpha(x,y)q(y)+(1-r(x))1(y=x)$.
+Plugging in for $p(y|x)$, we get $f(x)\alpha(x,y)q(y) = f(y)\alpha(x,y)q(x)$. In the Metropolis Hastings algorithm, $\alpha = min(1, \frac{f(y)q(x|y)}{f(x)q(y|x)})$. 
+
+
+
+#Gibbs Sampler with MH for all other conditionals
+
+
+```{r}
+n <- 86
+m <- 7
+v <- as.matrix(colMeans(V.est))
+logY <- as.matrix(cbind(logY1.avg, logY2.avg, logY3.avg, logY4.avg, logY5.avg, logY6.avg, logY7.avg))
+T = function(v, NU, ETA){(sqrt(ETA)/(v*sqrt(2*pi))) * exp(-ETA*((log(v) - NU)^2)/2)}
+
+
+# sample from the joint posterior (mu, tau | data)
+LAM <- NU <- MU <- ETA <- rep(0, 11000)
+burnin <- 1000    # burnin
+LAM[1] <- NU[1] <- MU[1] <- ETA[1] <- 0  # initialisation
+
+
+for(i in 2:11000) {   
+    ETA[i] <- rgamma(1, 3+(n/2), rate= (2 + 0.5 * colSums(as.matrix((v[,1] - NU[i-1])^2)))^2) #squared rate 
+    
+    LAM[i] <- rgamma(1, 2+(n*m/2), rate = (1 + 0.5* colSums(as.matrix(colSums(as.matrix((logY[,1:7] - MU[i-1] -log(v[,1])+log(v[,1] + Data.matrix[,2:8])^2))))))^2) #I squared the rate parameter here
+    
+    MU[i]  <- rnorm(1, (LAM[i]*colSums(as.matrix(colSums(as.matrix(logY[,1:7]-log(v[,1])+log(v[,1] + Data.matrix[,2:8]))))))/(LAM[i]*m*n -1),  (1/(1-LAM[i]*n*m))^2)
+    
+    NU[i]  <- rnorm(1, (ETA[i]*colSums(v))/(ETA[i]*n - 2), (1/(2-ETA[i]*n))^2)
+    
+    
+    MH = function(niter, startval, proposalsd){
+      VI = rep(0,niter)
+      VI[1] = startval     
+    for(i in 2:niter){
+        currentx = VI[i-1]
+        proposedx = rlnorm(1,mean=currentx,sd=proposalsd) 
+        A = min(1,(T(proposedx, NU[i], ETA[i])*dlnorm(currentx, mean=proposedx, sd=proposalsd))/(T(currentx, NU[i], ETA[i])*dlnorm(proposedx, mean=currentx, sd=proposalsd)))
+      if(runif(1)<A){
+        VI[i] = proposedx       # accept move with probabily min(1,A)
+      } else {
+       VI[i] = currentx        # otherwise "reject" move, and stay where we are
+      }
+    }
+    return(VI)
+  }
+}
+
+LAM1  <- LAM[-(1:burnin)]   # remove burnin
+ETA1  <- ETA[-(1:burnin)] 
+NU1   <- NU[-(1:burnin)]
+MU1   <- MU[-(1:burnin)]
+```
+
+
+Checking which choice of variance in the proposal density has the lowest/ quickest converging ACF
+
+```{r}
+A1 <- MH(10000, v[1,], 0.1)
+A2 <- MH(10000, v[1,], 1.5)
+A3 <- MH(10000, v[1,], 2)
+A4 <- MH(10000, v[1,], 3)
+A5 <- MH(10000, v[1,], 5)
+A6 <- MH(10000, v[1,], 10)
+A7 <- MH(10000, v[1,], 100)
+
+acf(A1)
+acf(A2)
+acf(A4)
+acf(A6)
+acf(A7)
+
+
+plot(A4,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance")
+lines(A1,col='green')
+lines(A7,col='blue')
+abline(h=2.7727582, col="red")
+
+plot(LAM1, type="l")
+abline(h=0.3662197, col="red")
+plot(ETA1, type="l")
+abline(h=11.5037734, col="red")
+plot(NU1, type="l")
+abline(h=1.0026784, col="red")
+plot(MU1, type="l")
+abline(h=0.1351008, col="red")
+
+
+```
+
+
+
+Using MH to get estimates for the 86 different v_i's
+
+
+```{r}
+set.seed(3)
+v.matrix= matrix(nrow=10000, ncol=86)
+
+for(k in 1:86){
+    v.matrix[1:10000,k] = MH(10000, v[k,], 3)
+}
+```
+
+
+```{r}
+EST <- as.matrix(cbind(LAM1, ETA1, NU1, MU1, v.matrix))
+
+dim(EST)
+```
+
+
+
+
+
+
+Going to do 86 MH steps for each v_i. 
+with v[,k] as parameters in the target function  from k = 1,...,86
+want to have 86 conditional densities for each individual with 1000 estimates each.
+
+
+#logY matrix
+
+I will now generate the matrix of $log(y_{ij})$ by using the estimates of the parameters from the Gibbs Sampler and Metropolis Hastings Estimate from the above code
+
+
+```{r}
+LOGY.matrix = matrix(nrow=86, ncol = 7)
+
+for(j in 2:8){
+  for(i in 1:86){
+    LOGY.matrix[i, j] = (mean(EST[,4]) + log(mean(v.matrix[,i])) - log(mean(v.matrix[,i]) + Data.matrix[i,j])+ (sqrt(1/mean(EST[,1])))*(mean(rnorm(10000, 0,1))))
+  }
+}
+
+
+rr=vector(mode = "logical", length = 86)
+for(i in 1:86){
+  rr[i]=  log(mean(v.matrix[,i]))
+}
+rr
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
