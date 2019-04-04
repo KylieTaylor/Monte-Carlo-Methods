@@ -1,0 +1,298 @@
+---
+title: "Monte Carlo Methods HW 4"
+author: "Kylie Taylor"
+date: "4/4/2019"
+output: pdf_document
+---
+
+#We have the weighted normal density of 
+
+#$$k(x|\theta) = wN(x|\mu_1, \sigma^2) +(1-w)N(x|\mu_2, \sigma^2)$$
+
+#With priors $\lambda = \frac{1}{\sigma^2} \sim Ga(1,1)$, and $f(\mu_1) \sim N(0,100)$, also $f(\mu_2) \sim N(0,100)$, and lastly $f(w) \sim U(0,1)$
+
+
+#1. Generate data of size n=100 from a standard normal distribution and run the Markov chain Gibbs sampler for the above model using the data you obtained.  The appropriate latent variable here is the $d$ which determines which group each observation came from.
+
+
+This means that the $d$, the latent variable, will show up as a subscript denoting which group (1 or 2) that each observation for $x$ came from. 
+
+Let $d_i =1$ if $x_i$ comes from $N(\mu_1, \sigma^2)$, and $d_i=2$ if $x_i$ comes from $N(\mu_2, \sigma^2)$. Where $w = w_1$ and $1-w = w_2$. 
+
+Keep in mind that $f(d_i)$ does not have a prior distribution, as it is a latent variable.
+
+
+The goal is to find the joint density $$k(x_i, d_i, \mu_1, \mu_2, w, \lambda)$$
+
+In order for the latent variable, $d$ to be included, the following must be true
+
+$$\sum_{d_i=1,2} k(x_i, d_i, \mu_1, \mu_2, w, \lambda) = k(x_i, \mu_1, \mu_2, w, \lambda)$$
+
+
+The full liklihood is :
+
+$$k(x_i, d_i, \mu_1, \mu_2, w, \lambda) = f(\mu_1)f(\mu_2)f(w)f(\lambda)\prod_{i=1}^n k(x_1|\mu_1, \mu_2, w, \lambda) $$
+
+$$ = N(0,100)*N(0,100)*Beta(1,1)*Ga(1,1)* \prod_{i=1}^n wN(x|\mu_1, \sigma^2) +(1-w)N(x|\mu_2, \sigma^2)$$
+
+
+
+I will continue to find the posterior conditional densities of the parameters
+
+
+I will start with the posterior for the weights
+
+$$f(w|x,d) = f(w) \prod_i w_{d_i} N(x_i|u_{d_i}, \sigma^2) \propto 1* \frac{w_1^{n_1} w_2^{n_2}}{\sqrt{2\pi \sigma^2}} e^{-\frac{\lambda}{2}\sum_i (x_i - \mu_{d_i})^2}$$
+
+$$\propto w_1^{n_1} w_2^{n_2} = w^{n_1} (1-w)^{N - n_1}$$
+
+This means that 
+$$f(w|x_i,d) \sim Beta(n_1 +1, n_2 +1)$$
+
+
+
+
+We are also interested in $f(d|x_i, \lambda, \mu_1, \mu_2, w)$ for $d_i = 1,2$ which we know is 
+
+$$Pr(d_i =1 | x_i, \lambda, \mu_1, \mu_2, w) = \frac{w_1 N(x_1 | \mu_1, \sigma^2)}{w_1 N(x_1 | \mu_1, \sigma^2)+w_2 N(x_2 | \mu_2, \sigma^2)} $$
+
+
+
+
+Next I will calculate the posterior for
+
+$$f(\mu_1 | x_i, d) = f(\mu_1)  \prod_i w_{d_i} N(x_i|u_{d_i}, \sigma^2)$$
+
+$$\propto e^{-\frac{\mu_1}{100}} e^{-\frac{\lambda}{2} \sum_{d_i=1} (x_i - \mu_1)^2} \propto e^{-\frac{\mu_1}{100}-\frac{\lambda}{2} \sum_{d_i=1} (x_i - \mu_1)^2}$$
+
+$$e^{-\mu_1^2 (\frac{1}{100} +\frac{\sum1(d_i=1)\lambda}{2}) + \lambda \mu_1 \sum_{d_i=1} x_i - \frac{\lambda}{2} \sum_{d_i=1} x_i^2}$$
+
+
+$$\propto e^{-(\frac{1}{100} +\frac{n_1\lambda}{2})(\mu_1^2 -\frac{\lambda \mu_1 \sum_{d_i=1} x_i}{\frac{1}{100} +\frac{n_1\lambda}{2}} +\frac{\frac{\lambda}{2} \sum_{d_i=1} x_i^2}{(\frac{1}{100} +\frac{n_1\lambda}{2})^2})}$$
+
+$$\propto e^{-(\frac{1}{100} +\frac{n_1\lambda}{2}) (\mu_1  -\frac{\frac{\lambda}{2} \sum_{d_i=1} x_i}{(\frac{1}{100} +\frac{n_1\lambda}{2})})^2}$$
+
+This makes 
+$$f(\mu_1 | x_i, d) \sim N( \frac{\frac{\lambda}{2} \sum_{d_i=1} x_i}{(\frac{1}{100} +\frac{n_1\lambda}{2})}, \frac{1}{(\frac{1}{100} +\frac{n_1\lambda}{2})})$$
+
+
+By symmetry, we know that the posterior for $\mu_2$ is 
+
+
+$$f(\mu_2 | x_i, d) \sim N( \frac{\frac{\lambda}{2} \sum_{d_i=2} x_i}{(\frac{1}{100} +\frac{n_2\lambda}{2})}, \frac{1}{(\frac{1}{100} +\frac{n_2\lambda}{2})})$$
+
+
+The last posterior I need to calculate is 
+
+$$f(\lambda |x_i, d) = f(\lambda) \prod_i w_{d_i} N(x_i|u_{d_i}, \sigma^2) \propto e^{-\lambda}\prod_i \lambda^{\frac{1}{2}} e^{-\frac{\lambda}{2} (x_i - \mu_{d_i})^2} $$
+
+$$\propto \lambda^{\frac{n}{2}} e^{-\lambda} e^{-\frac{\lambda}{2} \sum_i (x_i - \mu_{d_i})^2} $$
+
+This makes 
+$$f(\lambda |x_i, d) \sim Ga(1+\frac{n}{2} , 1+\frac{1}{2}\sum_i(x_i - \mu_{d_i})^2)$$
+
+
+
+I generated the data $x_i$ as 100 randomly sampled observations from a standard normal distribution. I will now use a Gibbs Framework to sample from the posterior distributions. I incorporated the latent variable, d, which determines which group each observation came from, for each iteration in the Gibbs framework. The $d_i$'s determine how many of the 100 observations come from group 1, $n_1$ or group 2, $n_2$. This number of observations from each group were then used to take a sample from the posteriors of the parameters. I ran 11,000 Gibbs iterations, with a 1,000 observation burn in (my computer couldn't reasonably handle more iterations).  
+
+
+
+```{r, include=FALSE}
+set.seed(20)
+X <- rnorm(100, 0, 1)
+library(ggplot2)
+
+#Gibbs Framework
+n <- 100
+library(mosaic)
+library(doMC)
+registerDoMC(cores=4)
+library(beepr)
+
+```
+
+```{r, include=FALSE}
+set.seed(20202)
+MC.gibbs <- do(100)*{
+  LAM <- W <- MU1 <- MU2 <- n1 <- n2  <- rep(0, 1100)
+  D1 <- D2 <- K <- rep(0, 100)
+  burnin <- 100    # burnin
+  LAM[1] <- W[1] <- MU1[1] <- MU2[1] <- 0.2  # initialisation
+  n1[1] <- n2[1] <- 50
+  for(i in 2:1100){
+    
+    W[i] <- rbeta(1, n1[i-1] +1 , n2[i-1]+1)
+    
+    MU1[i]  <- rnorm(1, ((LAM[i-1]/2)*sum(X))/(0.01 + n1[i-1]*LAM[i-1]/2),  (1/(0.01 + n1[i-1]*LAM[i-1]/2)))
+    
+    MU2[i]  <- rnorm(1, ((LAM[i-1]/2)*sum(X))/(0.01 + n2[i-1]*LAM[i-1]/2),  (1/(0.01 + n2[i-1]*LAM[i-1]/2)))
+    
+    LAM[i] <- rgamma(1, 1+(n/2), rate = (1 + 0.5* sum(as.matrix(W[i]*(X-MU1[i-1])^2 + (1-W[i])*(X- MU2[i-1])^2))))
+      
+    for(q in 1:100){ 
+      D1[q] <- (W[i]*dnorm(X[q], MU1[i], 1/LAM[i]))/(W[i]*dnorm(X[q], MU1[i], 1/LAM[i]) + (1-W[i])*dnorm(X[q], MU2[i], 1/LAM[i]))
+      
+      D2[q] <- ((1-W[i])*dnorm(X[q], MU2[i], 1/LAM[i]))/(W[i]*dnorm(X[q], MU1[i], 1/LAM[i]) + (1-W[i])*dnorm(X[q], MU2[i], 1/LAM[i]))
+    dis1 <- ifelse(D1>=mean(D1), 1, 0)
+    dis2 <- ifelse(D2>=mean(D2), 1, 0)
+    n1[i] <- sum(dis1)
+    n2[i] <- sum(dis2)
+    }        
+  }
+
+  lam  <- LAM[-(1:burnin)]   # remove burnin
+  w  <- W[-(1:burnin)] 
+  mu1   <- MU1[-(1:burnin)]
+  mu2   <- MU2[-(1:burnin)]
+  c(lam, w, mu1, mu2)
+}  
+beep(6)
+MC.gibbs
+```
+  
+
+
+
+#2. Plot the predictive density; this is done by taking the average of the densities you get at each iteration of the Markov chain. Does it look like it is a standard normal density?
+
+
+I averaged the posterior densities over each iteration of my Markov chain and used those converged estimates to generate the predicitve density, which is plotted below. The density looks very much like a standard normal density to me, centered around 0, with a variance of approx 1. Obviously with many more Monte Carlo iterations, the predictive density will look increasingly more like a standard normal density. 
+
+
+```{r, include=FALSE} 
+set.seed(9999)
+MC.gibbs.mat <- as.matrix.data.frame(MC.gibbs)
+lam.mc <- as.data.frame(MC.gibbs.mat[,1:1000])
+w.mc <- as.data.frame(MC.gibbs.mat[,1001:2000])
+mu1.mc <- as.data.frame(MC.gibbs.mat[,2001:3000])
+mu2.mc <- as.data.frame(MC.gibbs.mat[,3001:4000])
+
+lam.mc.mean <- as.matrix(colMeans(lam.mc))
+w.mc.mean <- as.matrix(colMeans(w.mc))
+mu1.mc.mean <- as.matrix(colMeans(mu1.mc))
+mu2.mc.mean <- as.matrix(colMeans(mu2.mc))
+
+K.plot <- do(1000)*{
+for(j in 1:1000){
+    K[j] <- (w.mc.mean[j])*rnorm(1, mu1.mc.mean[j] , 1/sqrt(mean(lam.mc.mean[j])))+(1-w.mc.mean[j])*rnorm(1, mu2.mc.mean[j], 1/sqrt(mean(lam.mc.mean[j])))
+}
+  rowMeans(as.matrix(K))
+}
+beep(4)
+k.df <- as.data.frame(K.plot)
+```
+
+```{r, echo=FALSE}
+ggplot(data = k.df, aes(x=K)) + geom_density() +labs(title = "Plot of the predictive density") + xlim(-4,4)
+```
+
+
+
+
+
+
+
+
+
+
+#3. Plot some of the posterior distributions for $\mu_1$ and $\mu_2$ and $\sigma$ and $w$. Is there any indication from these that the true density is standard normal?
+
+
+The next plots are the posterior distributions for the four parameters. Each parameter appears to be distributed normally, but not necessarily standard normal, as they are not centered over 0 with a variance of approx 1.
+
+The plots below are density plots of 10 individual MC estimates for $\lambda, w, \mu_1, and \mu_2$, respectively. As we can see, they all seem to follow a similar shape, just centered around different means.
+
+
+```{r, echo=FALSE}
+lam.plot <- ggplot(data =lam.mc)  + geom_density(aes(x=V1), alpha=0.25) + geom_density(aes(x=V10), alpha=0.25) + geom_density(aes(x=V50), alpha=0.25) + geom_density(aes(x=V810), alpha=0.25) + geom_density(aes(x=V100), alpha=0.25) + geom_density(aes(x=V400), alpha=0.25) + geom_density(aes(x=V700), alpha=0.25) + geom_density(aes(x=V101), alpha=0.25)+ geom_density(aes(x=V400), alpha=0.25)+ geom_density(aes(x=V999), alpha=0.25) + xlim(0,2) + labs(title="Density Plots of Several MC Itervations of Lambda", x="  ")
+
+w.plot <- ggplot(data =w.mc)  + geom_density(aes(x=V1001), alpha=0.25) + geom_density(aes(x=V1110), alpha=0.25) + geom_density(aes(x=V1150), alpha=0.25) + geom_density(aes(x=V1810), alpha=0.25) + geom_density(aes(x=V1009), alpha=0.25) + geom_density(aes(x=V1400), alpha=0.25) + geom_density(aes(x=V1700), alpha=0.25) + geom_density(aes(x=V1101), alpha=0.25)+ geom_density(aes(x=V1400), alpha=0.25)+ geom_density(aes(x=V1999), alpha=0.25) + xlim(0,1) + labs(title="Density Plots of Several MC Itervations of Lambda", x="  ")
+
+mu1.plot <- ggplot(data =mu1.mc)  + geom_density(aes(x=V2001), alpha=0.25) + geom_density(aes(x=V2110), alpha=0.25) + geom_density(aes(x=V2250), alpha=0.25) + geom_density(aes(x=V2380), alpha=0.25) + geom_density(aes(x=V2111), alpha=0.25) + geom_density(aes(x=V2333), alpha=0.25) + geom_density(aes(x=V2700), alpha=0.25) + geom_density(aes(x=V2102), alpha=0.25)+ geom_density(aes(x=V2030), alpha=0.25)+ geom_density(aes(x=V2999), alpha=0.25) + xlim(-0.25,0.25) + labs(title="Density Plots of Several MC Itervations of Mu 1", x="  ")
+
+mu2.plot <- ggplot(data = mu2.mc)  + geom_density(aes(x=V3001), alpha=0.25) + geom_density(aes(x=V3110), alpha=0.25) + geom_density(aes(x=V3250), alpha=0.25) + geom_density(aes(x=V3380), alpha=0.25) + geom_density(aes(x=V3111), alpha=0.25) + geom_density(aes(x=V3333), alpha=0.25) + geom_density(aes(x=V3700), alpha=0.25) + geom_density(aes(x=V3102), alpha=0.25)+ geom_density(aes(x=V4000), alpha=0.25)+ geom_density(aes(x=V3999), alpha=0.25) + xlim(-0.25,0.25) + labs(title="Density Plots of Several MC Itervations of Mu 2", x="  ")
+
+
+gridExtra::grid.arrange(lam.plot ,w.plot)  
+gridExtra::grid.arrange(mu1.plot, mu2.plot)
+```
+
+
+
+
+
+#4. Now consider the $(d_i)$ from the output of your Markov chain. Is there any indication that these show there is a single group?
+
+
+The plot below is a trace plot for $d_i=1$. I only included the plot for $d_1$ since, if the observtion does not come from $d_i=1$, it clearly will come from $d_i=2$. The plot below reveals that there is variation in the probability of a particular observation coming from a certian group, thus number of observations coming from a particular group also varies.  
+
+
+```{r, echo=FALSE}
+dee1 <- as.data.frame(D1)
+DEE1 <- do(10)*{
+  sample(dee1, replace = TRUE)
+}
+
+plot(DEE1$D1, type='l', main="Probability that an observation comes from d=1", ylab = "Percentage of D1", xlab="Iteration")
+```
+
+
+
+
+
+
+#5. Evaluate the integral
+$$I = \int xg_p(x) dx$$
+#where $g_p$ is the predictive density you got from part 2.
+
+
+Here we know that the integral cannot be solved analytically, or using standard calculus, this is why I implement a Monte Carlo Markov Chain. By the definition of a Monte Carlo integral, the estimated I will equal
+$$\hat{I} =  \frac{1}{N} \sum_{i=1}^N x_i$$
+
+$g_p(x)$ is the predictive density from part 2, which is estimated using
+$$\hat{k(x|\theta)} = \hat{w} N(x|\hat{\mu_1}, \hat{\sigma}^2) +(1-\hat{w})N(x|\hat{\mu_2}, \hat{\sigma}^2) $$
+
+The Monte Carlo estimates of the parameters are used to make the Monte Carlo estimates of the predicitve density for x.
+
+I implemented the code and got and evaluated the integral to be 0.01275.
+
+```{r, echo=FALSE}
+for(j in 1:1000){
+    K[j] <- (w.mc.mean[j])*rnorm(1, mu1.mc.mean[j] , 1/sqrt(mean(lam.mc.mean[j])))+(1-w.mc.mean[j])*rnorm(1, mu2.mc.mean[j], 1/sqrt(mean(lam.mc.mean[j])))
+}
+par(mfrow=c(2,1))
+plot(K, type='l', main = "Density of the Integral")
+abline(h=mean(K), col="red")
+plot(density(K), main = "Density of the Integral")
+abline(v=mean(K), col="red")
+```
+
+
+
+
+#6. Estimate
+$$w\mu_1 + (1-w)\mu_2$$
+#from the output of the Markov chain. How does this compare with your answer for 5?
+
+
+I estimated the equation by using the Monte Carlo estimates for $w, \mu_1 and \mu_2$ and got a value of 0.009913. This is incredibly close to the estimated value of the integral above, which both round to 0.01. 
+
+```{r, echo=FALSE}
+G <- rep(0,100)
+for(u in 1:100){
+  G[u] <- (w.mc.mean[u])*(mu1.mc.mean[u]) + (1-w.mc.mean[u])*(mu2.mc.mean[u])
+}
+
+par(mfrow=c(2,1))
+plot(G, type='l', main = "Plot of the Estimated Equation")
+abline(h=mean(G), col="red")
+plot(density(G), main = "Density of the Estimated Equation")
+abline(v=mean(G), col="red")
+```
+
+
+
+
+
+
+
