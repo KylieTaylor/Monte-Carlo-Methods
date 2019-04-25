@@ -1,0 +1,663 @@
+---
+title: "MC Methods Homework 3"
+author: "Kylie Taylor"
+date: "3/7/2019"
+output: pdf_document
+---
+
+
+##1
+
+#Suppose $f(a, b) \propto a^3 b^2 e^{-a-ab}$, with a, b > 0, is required to be sampled. Find $f(a|b)$ and $f (b|a)$ and hence find a transition density $p(a_{n+1},b_{n+1}|a_n,b_n)$ which has f as the stationary density.
+#Implement the chain and use the output to evaluate the integral $I = \int \int a b f(a,b) da db$.
+
+We are given the target density of 
+
+$f(a,b) \propto a^3 b^2 e^{-a-ab}$ also $\propto f(a) f(b) \prod^n_{i=1} k(x_i | a,b)$, 
+
+which we use to find the two conditionals, $f(a|b)$ and $f(b|a)$. The conditionals are defined as
+
+$f(a|b)\propto f(a) \prod^n_{i=1} k(x_i | a,b)$ and $f(b|a)\propto f(b) \prod^n_{i=1} k(x_i | a,b)$.
+
+These steps would be flawless if we could easily sample from $f(a)$, $f(b)$ and $f(a,b)$, but often times we cannot easily sample from one or several of these densities using the Gibbs framework. 
+
+The idea in Gibbs sampling is to generate posterior samples by sweeping through each variable (or block of variables) to sample from its conditional distribution with the remaining variables fixed to their current values. We simulate samples by sweeping through all the posterior conditionals, one random variable at a time. This means we will start with a chosen $a_0$, then sample $b_1$ from $f(b|a_0)$, we will then sample $a_1$ from $f(a|b_0)$, then $b_1$ from $f(b|a_1)$ and so on, until we have samples $(a_1, b_1), (a_2, b_2), (a_3, b_3), ... , (a_N, b_N)$ for some large N that I decide as fitting. The idea is that 
+
+$lim_{N \rightarrow \infty} = \frac{1}{N} \sum^N_{m=1} l(a_m, b_m) \Rightarrow \int\int l(a, b)f(b,a) dadb$ 
+
+
+In this problem, again we have $f(a,b) \propto a^3 b^2 e^{-a-ab} \propto f(a) f(b) \prod^n_{i=1} k(x_i | a,b)$
+
+I will find the conditional densities by essentially integrating b from $f(a|b)$, because b doesn't exist in this conditional, and vice versa. This means that $f(a,b) \propto f(a|b)$, and vice versa. This gives me 
+
+$f(a|b) \propto a^3*e^{-a-ab}=a^3e^{-a(1+b)}$ is  distributed as a gamma, $\Gamma(4, \frac{1}{b+1})$
+and  
+$f(b|a) \propto b^2e^{-ab}$ is also distributed as a gamma, $\Gamma(3,\frac{1}{a})$.
+
+Using these two conditional densities, I can use the Gibbs Sampler framework to find a transition density, $p(a_{n+1},b_{n+1}|a_n,b_n)$ which has the stationary density $f$, and ultimatley evaluate $I = \int \int a b f(a,b) da db$.
+
+The transition density had the following form 
+
+$p(a_{n+1},b_{n+1}|a_n,b_n) = f_d(b_{n+1}| a_{n+1},a_n,b_n) * f_{d-1}(a_{n+1}| a_n, b_n)$
+
+and is a series of two conditional densities. To implement the Gibbs Sampler with the above transition density, I will do the following steps:
+
+1) Start with initial value  $b_0$ that are picked at my discretion.
+2) Obtain a $a_1$ from the $\Gamma(4, \frac{1}{b_0+1})$. Save this sample.
+3) Use the $a_1$ to obtain a $b_1$ from the $\Gamma(3,\frac{1}{a_1})$. Save this sample.
+4) Use the $b_1$ to obtain a $a_2$ from the $\Gamma(4, \frac{1}{b_1+1})$. Save sample.
+5) Repeat steps 2-3 for $(a_1, b_1)$ until $(a_n, b_n)$, to obtain n pairs or samples.
+
+To finish, I will estimate the integral, $I = \int \int a b f(a,b) da db$ by
+$\hat{I}=\frac{1}{N} \sum^N_{m=1} l(a_m, b_m)$. 
+Remember the idea, $lim_{N \rightarrow \infty} = \frac{1}{N} \sum^N_{m=1} l(a_m, b_m) \Rightarrow \int\int l(a, b)f(b,a) dadb$
+
+
+After running the simulation, I found that the integral evaluates to approximately 2.9, with starting values of $(a_0, b_0)= (0,0)$
+
+
+
+```{r, include=FALSE}
+F <- function(a,b){a^3*b^2*exp(-a-a*b)}
+I <- function(a,b){a*b*a^3*b^2*exp(-a-a*b)}
+pracma::integral2(I, 0, 1000, 0, 1000)
+
+```
+
+```{r, include=FALSE}
+set.seed(876443)
+gibbs<-function(n) {
+        mat <- data.frame(a = 2, b = n)
+        a <- 0
+        b <- 0
+        mat[1, ] <- c(a, b)
+        for (i in 2:n) {
+                a <- rgamma(1, 4, (b+1)) #fix this code
+                b <- rgamma(1, 3, a) #this one too
+                mat[i, ] <- c(a, b)
+        }
+        mat
+}
+
+M <- gibbs(10000)
+M$c <- M$a*M$b
+mean(M$c)
+```
+
+
+
+
+
+
+##2
+
+#Suppose we wish to sample from $f(x) \propto \frac{exp(-0.5x^2)}{1+x^2} ,  -\infty < x < \infty$ using a Metropolis–Hastings algorithm with proposal density $q(x'|x) = N(x'|x, \sigma^2)$ for some $\sigma$ > 0.
+#Describe what you think might be the problems encountered if (i) $\sigma$ is too small and (ii) $\sigma$ is too big. Run the algorithm with such $\sigma$ to verify your conclusions.
+#Without using any theory, find what you think is a suitable $\sigma$ and run the algorithm with this $\sigma$ to evaluate $I = \int xf(x)dx$. 
+#What happens if instead you use $q(x'|x) = N(x'|-x, \sigma^2)$?
+
+
+
+If $\sigma$ is too small, the sample $X_{n+1}$ will deviate very little from the sample its conditioned on, $X_n$. This means that the MH algorithm will not move very much, or at all if $\sigma$ is 0, and remain stagnant around $X_n$. 
+
+If $\sigma$ is too big the following $\alpha(x, x')$
+
+$\alpha(x, x') = min(1, \frac{f(x)q(x'|x)}{f(x')q(x|x')}) = min(1, \frac{(1+x'^2) exp(-0.5(\frac{x'-\mu}{\sigma^2}^2)+x^2)}{(1+x^2) exp(-0.5(\frac{x-\mu}{\sigma^2}^2)+x'^2)}$
+
+will be very small with very high probability, since the fraction will be less than 1. This is a problem because it means that our algorithm will not move from $X_n$ very often, and when it does, it will make big moves. 
+
+In summary, extreme $\sigma$'s lead to very high correlations between samples $x_{n+1}$ and $X_n$. This can be seen in the following graphs. To obtain these graphs, I ran the Metropolis Hastings algorithm with different levels of $\sigma$. 
+
+To simulate this alogrithm, I used the following steps:
+1) given the proposal state $X_n$, take a proposal state $X' \sim q$
+2) take $u \sim U(0,1)$
+3) if $u < \alpha(x, x')$ then $X_{n+1} = x'$, if not then $X_{n+1} = x_n$
+
+In more general terms, we are sampling from 
+$P(X_{n+1}|X_n) = r(X_n) \tilde{q}(X_{n+1}|X_n) + (1- r(X_n)) 1(X_{n+1}=X_n)$
+where $r(X) = P(u < \alpha(x, x')) = \int \alpha(x, x')q(x')dx'$
+
+The plot of the sample estimates for 1000 iterations of the MH algorithm reveals that for a very small variance, the samples stay very similar to their starting point, $X_0$, which I set to be 3. This is the top line on the plot. The plot also reveals what happens when there is a very large variance, the algorithm will make very large jumps at infrequent periods. This line is shown by the line that appears to be boxy and makes inconsistent jumps. 
+The alogrithm with a standard normal distribution and variance of 1, makes random jumps around the mean of zero, which is what we expect and want since $X_{n+1}$ is not extremely correlated with $X_n$.
+
+
+
+```{r, echo=FALSE}
+library(mcmc)
+set.seed(87201)
+T = function(x){exp(-0.5*x^2)/(1+x^2)}
+
+MH = function(niter, startval, proposalsd){
+  x = rep(0,niter)
+  x[1] = startval     
+  for(i in 2:niter){
+    currentx = x[i-1]
+    proposedx = rnorm(1,mean=currentx,sd=proposalsd) 
+    A = min(1,(T(proposedx)*dnorm(currentx, mean=proposedx, sd=proposalsd))/(T(currentx)*dnorm(proposedx, mean=currentx, sd=proposalsd)))
+    if(runif(1)<A){
+      x[i] = proposedx       # accept move with probabily min(1,A)
+    } else {
+      x[i] = currentx        # otherwise "reject" move, and stay where we are
+    }
+  }
+  return(x)
+}
+
+z1=MH(1000,0,1)
+z2=MH(1000,0,0.01)
+z3=MH(1000,0,200)
+
+library(stats)
+acf(z1)
+acf(z2)
+
+
+plot(z1,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance")
+lines(z2,col='red')
+lines(z3,col='blue')
+```
+
+
+To verify my findings from the plot above, I plotted histograms of the estimates of the target distribution for the three different $\sigma$'s. We again see the estimates with a standard normal distribution are evenly centered around the mean, the estimates with a very low $\sigma$ are localized around the initial value, 3 and nowhere else, and the estimates with a large $\sigma$ are very scattered.
+
+```{r, echo=FALSE}
+par(mfcol=c(3,1))
+maxz=max(c(z1,z2,z3))
+hist(z1, breaks= 20, xlim = c(-2,4), main = "Histogram of sigma = 1")
+hist(z2, breaks= 20, xlim = c(-2,4), main = "Histogram of very small sigma")
+hist(z3, breaks= 20, xlim = c(-2,4), main = "Histogram of very large sigma")
+```
+
+
+
+To determine what I belive a suitable $\sigma$ is, I ran the Metropolis Hastings algorithm for 22 different $\sigma$'s and compared their estimate of the integral to the true value of the integral. The table below shows the different $\sigma$ values and their respective estimates, and the variance of thoes estimates, with 10,000 iterations of the MH algorithm.
+Based off my table, I believe that a $\sigma$ between the values of 1.5 and 4.5 preforms the best, in particular, a $\sigma$ of about 2.5 would be most suitable for this proposal density. 
+
+
+
+```{r, echo=FALSE}
+set.seed(9091)
+TX = function(x){x*exp(-0.5*x^2)/(1+x^2)}
+
+integrate(TX,-1000,1000)
+
+metrop <- function(x){mean(MH(10000, 3, x))}
+metrop.var <- function(x){var(MH(10000, 3, x))}
+z <- data.frame(c(0.001, 0.01, 0.1, 0.5, 0.8, 1, 1.2, 1.5, 1.7, 2, 2.5, 3, 3.5, 4, 4.5, 5, 7, 10, 30, 50, 100, 200))
+H <- data.frame(c(0.001, 0.1,  1,  200))
+
+Estimate <- apply(H, MARGIN = 1, FUN = metrop)
+EstimateVar <- apply(H, MARGIN = 1, FUN = metrop.var)
+Z <- cbind(H,Estimate, EstimateVar)
+colnames(Z) <- c("Sigma Values", "Estimate", "Estimate Variance")
+pander::pander(Z)
+```
+
+
+
+The following reveals how the MH algorithm with a $\sigma = 2.5$ preforms when evaluating the integral 
+$I = \int xf(x)dx = \int^{\infty}_{-\infty} x \frac{exp(-0.5x^2)}{1+x^2} dx$.
+
+I integrated the function on R to check as a check to see if the MH algorithm does well, I find that the estimated integral shoudl evaluate to 0. The MH algorithm does a better job at acheiving the true value of the integral, when there are more iterations. This can be seen in the table below, where 1e+05 iterations has the closest estimate at 0.001.
+
+
+
+```{r, echo=FALSE}
+library(mcmc)
+set.seed(8720)
+T = function(x){exp(-0.5*x^2)/(1+x^2)}
+TX = function(x){x*exp(-0.5*x^2)/(1+x^2)}
+
+integrate(TX, -1000, 1000)
+
+MH = function(niter, startval, proposalsd){
+  x = rep(0,niter)
+  x[1] = startval     
+  for(i in 2:niter){
+    currentx = x[i-1]
+    proposedx = rnorm(1, mean=currentx, sd=proposalsd) 
+    A = T(proposedx)/T(currentx)
+    if(runif(1)<A){
+      x[i] = proposedx       # accept move with probabily min(1,A)
+    } else {
+      x[i] = currentx        # otherwise "reject" move, and stay where we are
+    }
+  }
+  return(x)
+}
+
+z1=MH(10000,0,2.5)
+z2=MH(100000,0,2.5)
+z3=MH(1000000,0,2.5)
+Iterations <- c(10000, 100000, 100000)
+MH.Est <- c(mean(z1), mean(z2) ,mean(z3))
+D <- cbind(Iterations, MH.Est)
+pander::pander(D)
+```
+
+
+
+If I instead use the proposal desnity of $q(x'|x) = N(x'| -x, \sigma^2)$, we see that the series is not as persistent for low $\sigma$'s and does not make jumps like it did with the original proposal density for large $\sigma$'s. 
+
+
+```{r, echo=FALSE}
+set.seed(988)
+MH = function(niter, startval, proposalsd){
+  x = rep(0,niter)
+  x[1] = startval     
+  for(i in 2:niter){
+    currentx = x[i-1]
+    proposedx = rnorm(1, mean = -currentx, sd=proposalsd) 
+    A = min(1,(T(proposedx)*dnorm(currentx, mean=-proposedx, sd=proposalsd))/(T(currentx)*dnorm(proposedx, mean=-currentx, sd=proposalsd)))
+    if(runif(1)<A){
+      x[i] = proposedx       # accept move with probabily min(1,A)
+    } else {
+      x[i] = currentx        # otherwise "reject" move, and stay where we are
+    }
+  }
+  return(x)
+}
+
+z1=MH(1000,0,1)
+z2=MH(1000,0,0.01)
+z3=MH(1000,0,200)
+
+plot(z1,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance")
+lines(z2,col='red')
+lines(z3,col='blue')
+```
+
+
+
+
+Next, I determined how the MH algorithm did when estimating the integral 
+$I = \int xf(x)dx = \int^{\infty}_{-\infty} x \frac{exp(-0.5x^2)}{1+x^2} dx$ 
+with the now proposal density $q(x'|x) = N(x'| -x, \sigma^2)$. 
+
+Tha table below reveals that this algorithm is more accurate for very high $\sigma$'s. This is a very different result from the estimation from the original MH algorithm. 
+
+
+
+```{r, echo=FALSE}
+metrop <- function(x){mean(MH(10000, 1, x))}
+z <- data.frame(c(0.001, 0.01, 0.1, 0.5, 0.8, 1,  2, 2.5, 3, 4,  5, 7, 10, 30, 50, 100, 200, 300, 400))
+
+Estimate <- apply(z, MARGIN = 1, FUN = metrop)
+EstimateVar <- apply(z, MARGIN = 1, FUN = metrop.var)
+Z <- cbind(z,Estimate, EstimateVar)
+colnames(Z) <- c("Sigma Values", "Estimate", "Estimate Variance")
+pander::pander(Z)
+```
+
+
+
+
+
+
+##3
+#Suppose a Bayesian posterior density for the parameter $\theta$ is given by
+
+#$f(\theta|data) \propto e^{\theta a} e^{-me^\theta} e^{-0.5\theta^2}$
+
+#for some a > 0 and m integer,and $-\infty < \theta < \infty$. In fact this is a Poisson model with mean $e^\theta$ and standard normal prior for $\theta$.
+#Find a Markov chain for sampling from f and implement it, choosing your own values for m and a.
+
+
+
+We know that a Bayesian model has three parts, comibined in the following
+
+Posterior = liklihood * prior
+
+In the setting of this problem, this is equal to
+
+$f(\theta|data) \propto \prod^n_{i=1} k(y_i|\theta) \pi(\theta) \propto e^{\theta a} e^{-me^\theta} e^{-0.5\theta^2}$
+
+This means $k(y_i|\theta) = e^{\theta a} e^{-me^\theta}$ and $\pi(\theta) = e^{-0.5\theta^2}$.
+
+This means that our learning about $\theta$ is done through 
+
+$f(\theta) = \frac{\prod^n_{i=1} k(y_i|\theta) \pi(\theta)}{\int\prod^n_{i=1} k(y_i|\theta) \pi(\theta)} \propto \frac{e^{\theta a} e^{-me^\theta} e^{-0.5\theta^2}}{\int^\infty_{-\infty} e^{\theta a} e^{-me^\theta} e^{-0.5\theta^2}}$
+
+We are in search of a clean Markov idea that has a stationary density. The Gibb's sampler will not work for this target density, because there is only one parameter, $\theta$ and in order to run a Gibb's Sampler, there needs to be at least two parameters of interest. Since we got stuck in the Gibb's Framework, we know that a Metropolis Hastings algorithm should work. 
+
+I will implement a transformation of $\theta$ for this problem. The transformation will be g($\theta$) = logf($\theta$), which I will call Y($\theta$).
+
+$Y(\theta) \propto (\theta a) (-ma^\theta)(-\frac{1}{2}\theta^2)$
+
+I will use a Metropolis Hastings algorithm with the transformed posterior density, $Y(\theta)$ to find a markov chain for smapling from f. I initially chose an a=1 and m=1.
+I will use a proposal density of $p(\theta'|\theta) = N(\theta'| \theta, \sigma^2)$. 
+This means that 
+
+$\alpha(\theta, \theta') = min(1,\frac{Y(\theta')q(\theta|\theta')}{Y(\theta)q(\theta'|\theta)})= \frac{{\theta'}^3 e^{\theta'}}{\theta^3 e^\theta}$
+
+I will implement the MH algorithm which I described above. 
+I initially chose an a=4 and m=3, completely aribitrarily. 
+
+Based off the plot below, we see similar results from above. For a small $\sigma$, the estimations do not move far from the initial value (3), for alarge $\sigma$ the estimates make big jumps, and for a reasonable $\sigma$, the algorithm is mobile, making a consistent amount of acceptions and rejections. 
+
+
+
+```{r, echo=FALSE}
+library(mcmc)
+set.seed(87111)
+F = function(x){(exp(x)*4)*(exp(-3*exp(x)))*(exp(-0.5*x^2))}
+Y = function(x){(x)(-0.5*x^2)}
+Z = function(x){(x^3)*(exp(x))}
+
+MH = function(niter, startval, proposalsd){
+  x = rep(0,niter)
+  x[1] = startval     
+  for(i in 2:niter){
+    currentx = x[i-1]
+    proposedx = rnorm(1, mean=currentx, sd=proposalsd)  
+    A = F(proposedx)/F(currentx)
+    if(runif(1)<A){
+      x[i] = proposedx       # accept move with probabily min(1,A)
+    } else {
+      x[i] = currentx        # otherwise "reject" move, and stay where we are
+    }
+  }
+  return(x)
+}
+
+z1=MH(1000,3, 0.5)
+z2=MH(1000,3, 0.007)
+z4=MH(1000,3, 50)
+
+
+plot(z1,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance, a=4, m=3")
+lines(z2,col='red')
+lines(z4,col='blue')
+
+```
+
+
+This histogram validates my observations from the graph above.
+
+```{r, echo=FALSE}
+
+par(mfcol=c(3,1))
+maxz=max(c(z1,z2,z3))
+hist(z1, breaks= 20, xlim = c(-2,4), main = "Histogram of sigma = 1")
+hist(z2, breaks= 20, xlim = c(-2,4), main = "Histogram of very small sigma")
+hist(z3, breaks= 20, xlim = c(-2,4), main = "Histogram of very large sigma")
+
+```
+
+
+We can also see that for more iterations that the chain will converge to a similar mean, for many levels of $\sigma$, even though some $\sigma$'s will converge quicker, which are $\sigma$'s that should be used for analysis. 
+
+
+```{r, echo=FALSE}
+set.seed(111111)
+z1=MH(10000,3, 0.5)
+z2=MH(10000,3, 0.007)
+z4=MH(10000,3, 50)
+
+
+plot(z1,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance, a=4, m=3")
+lines(z2,col='red')
+lines(z4,col='blue')
+```
+
+
+
+
+##Code in R
+
+#1)
+```{r, eval=FALSE}
+F <- function(a,b){a^3*b^2*exp(-a-a*b)}
+I <- function(a,b){a*b*a^3*b^2*exp(-a-a*b)}
+pracma::integral2(I, 0, 1000, 0, 1000)
+
+```
+
+```{r, eval=FALSE}
+set.seed(876443)
+gibbs<-function (n) 
+{
+        mat <- data.frame(a = 2, b = n)
+        a <- 0
+        b <- 0
+        mat[1, ] <- c(a, b)
+        for (i in 2:n) {
+                a <- rgamma(1, 4, (b+1)) #fix this code
+                b <- rgamma(1, 3, a) #this one too
+                mat[i, ] <- c(a, b)
+        }
+        mat
+}
+
+M <- gibbs(10000)
+M$c <- M$a*M$b
+mean(M$c)
+```
+
+
+
+#2)
+
+
+```{r, eval=FALSE}
+library(mcmc)
+set.seed(87201)
+T = function(x){exp(-0.5*x^2)/(1+x^2)}
+
+MH = function(niter, startval, proposalsd){
+  x = rep(0,niter)
+  x[1] = startval     
+  for(i in 2:niter){
+    currentx = x[i-1]
+    proposedx = rnorm(1,mean=currentx,sd=proposalsd) 
+    A = min(1,T(proposedx)/T(currentx))
+    if(runif(1)<A){
+      x[i] = proposedx       # accept move with probabily min(1,A)
+    } else {
+      x[i] = currentx        # otherwise "reject" move, and stay where we are
+    }
+  }
+  return(x)
+}
+
+z1=MH(1000,3,1)
+z2=MH(1000,3,0.01)
+z3=MH(1000,3,200)
+
+plot(z1,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance")
+lines(z2,col='red')
+lines(z3,col='blue')
+```
+
+```{r, eval=FALSE}
+par(mfcol=c(3,1))
+maxz=max(c(z1,z2,z3))
+hist(z1, breaks= 20, xlim = c(-2,4), main = "Histogram of sigma = 1")
+hist(z2, breaks= 20, xlim = c(-2,4), main = "Histogram of very small sigma")
+hist(z3, breaks= 20, xlim = c(-2,4), main = "Histogram of very large sigma")
+```
+
+```{r, eval=FALSE}
+set.seed(9091)
+TX = function(x){x*exp(-0.5*x^2)/(1+x^2)}
+
+integrate(TX,-1000,1000)
+
+metrop <- function(x){mean(MH(10000, 0, x))}
+metrop.var <- function(x){var(MH(10000, 0, x))}
+z <- data.frame(c(0.001, 0.01, 0.1, 0.5, 0.8, 1, 1.2, 1.5, 1.7, 2, 2.5, 3, 3.5, 4, 4.5, 5, 7, 10, 30, 50, 100, 200))
+
+Estimate <- apply(z, MARGIN = 1, FUN = metrop)
+EstimateVar <- apply(z, MARGIN = 1, FUN = metrop.var)
+Z <- cbind(z,Estimate, EstimateVar)
+colnames(Z) <- c("Sigma Values", "Estimate", "Estimate Variance")
+pander::pander(Z)
+```
+
+```{r, eval=FALSE}
+library(mcmc)
+set.seed(8720)
+T = function(x){exp(-0.5*x^2)/(1+x^2)}
+TX = function(x){x*exp(-0.5*x^2)/(1+x^2)}
+
+integrate(TX, -1000, 1000)
+
+MH = function(niter, startval, proposalsd){
+  x = rep(0,niter)
+  x[1] = startval     
+  for(i in 2:niter){
+    currentx = x[i-1]
+    proposedx = rnorm(1, mean=currentx, sd=proposalsd) 
+    A = T(proposedx)/T(currentx)
+    if(runif(1)<A){
+      x[i] = proposedx       # accept move with probabily min(1,A)
+    } else {
+      x[i] = currentx        # otherwise "reject" move, and stay where we are
+    }
+  }
+  return(x)
+}
+
+z1=MH(10000,0,2.5)
+z2=MH(100000,0,2.5)
+z3=MH(1000000,0,2.5)
+Iterations <- c(10000, 100000, 100000)
+MH.Est <- c(mean(z1), mean(z2) ,mean(z3))
+D <- cbind(Iterations, MH.Est)
+pander::pander(D)
+```
+
+```{r, eval=FALSE}
+set.seed(988)
+MH = function(niter, startval, proposalsd){
+  x = rep(0,niter)
+  x[1] = startval     
+  for(i in 2:niter){
+    currentx = -x[i-1]
+    proposedx = rlnorm(1, mean=currentx, sd=proposalsd) 
+    A = min(1,T(proposedx)/T(currentx))
+    if(runif(1)<A){
+      x[i] = proposedx       # accept move with probabily min(1,A)
+    } else {
+      x[i] = currentx        # otherwise "reject" move, and stay where we are
+    }
+  }
+  return(x)
+}
+
+z1=MH(1000,0,1)
+z2=MH(1000,0,0.01)
+z3=MH(1000,0,200)
+
+plot(z1,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance")
+lines(z2,col='red')
+lines(z3,col='blue')
+```
+
+```{r, eval=FALSE}
+metrop <- function(x){mean(MH(10000, 0, x))}
+metrop.var <- function(x){var(MH(10000, 0, x))}
+z <- data.frame(c(0.001, 0.01, 0.1, 0.5, 0.8, 1,  2, 2.5, 3, 4,  5, 7, 10, 30, 50, 100, 200, 300, 400))
+
+Estimate <- apply(z, MARGIN = 1, FUN = metrop)
+EstimateVar <- apply(z, MARGIN = 1, FUN = metrop.var)
+Z <- cbind(z,Estimate, EstimateVar)
+colnames(Z) <- c("Sigma Values", "Estimate", "Estimate Variance")
+pander::pander(Z)
+```
+
+
+
+
+#3)
+
+```{r, eval=FALSE}
+library(mcmc)
+set.seed(87111)
+F = function(x){(exp(x)*4)*(exp(-3*exp(x)))*(exp(-0.5*x^2))}
+Y = function(x){(x)(-0.5*x^2)}
+Z = function(x){(x^3)*(exp(x))}
+
+MH = function(niter, startval, proposalsd){
+  x = rep(0,niter)
+  x[1] = startval     
+  for(i in 2:niter){
+    currentx = x[i-1]
+    proposedx = rnorm(1, mean=currentx, sd=proposalsd)  
+    A = F(proposedx)/F(currentx)
+    if(runif(1)<A){
+      x[i] = proposedx       # accept move with probabily min(1,A)
+    } else {
+      x[i] = currentx        # otherwise "reject" move, and stay where we are
+    }
+  }
+  return(x)
+}
+
+z1=MH(1000,3, 0.5)
+z2=MH(1000,3, 0.007)
+z4=MH(1000,3, 50)
+
+
+plot(z1,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance, a=4, m=3")
+lines(z2,col='red')
+lines(z4,col='blue')
+
+```
+
+```{r, eval=FALSE}
+
+par(mfcol=c(3,1))
+maxz=max(c(z1,z2,z3))
+hist(z1, breaks= 20, xlim = c(-2,4), main = "Histogram of sigma = 1")
+hist(z2, breaks= 20, xlim = c(-2,4), main = "Histogram of very small sigma")
+hist(z3, breaks= 20, xlim = c(-2,4), main = "Histogram of very large sigma")
+
+```
+
+```{r, eval=FALSE}
+set.seed(111111)
+z1=MH(10000,3, 0.5)
+z2=MH(10000,3, 0.007)
+z4=MH(10000,3, 50)
+
+
+plot(z1,type="l", ylab = "Estimates of Target Distribution", 
+     xlab = "Iterations", main="MH Algorithm with Differing Variance, a=4, m=3")
+lines(z2,col='red')
+lines(z4,col='blue')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
